@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	ErrExpiredItem = errors.New("item has expired")
+	ErrItemHasExpired = errors.New("item has expired")
 )
