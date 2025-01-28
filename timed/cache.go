@@ -9,8 +9,8 @@ import (
 type (
 	// Item represents a cached value with an expiration time
 	Item struct {
-		value     interface{}
 		expiresAt time.Time
+		value     interface{}
 	}
 
 	// Cache represents an in-memory cache
@@ -23,8 +23,8 @@ type (
 // NewItem creates a new cache item
 func NewItem(value interface{}, expiresAt time.Time) *Item {
 	return &Item{
-		expiresAt: expiresAt,
-		value:     value,
+		expiresAt,
+		value,
 	}
 }
 
