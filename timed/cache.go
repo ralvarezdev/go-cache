@@ -1,9 +1,10 @@
 package timed
 
 import (
-	gocache "github.com/ralvarezdev/go-cache"
 	"sync"
 	"time"
+
+	gocache "github.com/ralvarezdev/go-cache"
 )
 
 type (
