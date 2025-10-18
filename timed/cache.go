@@ -266,3 +266,60 @@ func (c *Cache) Delete(key string) {
 
 	delete(c.items, key)
 }
+
+// GetExpirationTime retrieves the expiration time of a cached item
+//
+// Parameters:
+//
+//   - key: The key associated with the cached value
+//
+// Returns:
+//
+//   - time.Time: The expiration time of the cached item, or zero time if not found
+func (c *Cache) GetExpirationTime(key string) time.Time {
+	if c == nil {
+		return time.Time{}
+	}
+
+	// Lock the cache
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	// Check if the item exists
+	item, found := c.items[key]
+	if !found {
+		return time.Time{}
+	}
+
+	return item.expiresAt
+}
+
+// UpdateExpirationTime updates the expiration time of a cached item
+//
+// Parameters:
+//
+//   - key: The key associated with the cached value
+//   - expiresAt: The new expiration time to be set
+//
+// Returns:
+//
+//   - error: An error if the item is not found
+func (c *Cache) UpdateExpirationTime(key string, expiresAt time.Time) error {
+	if c == nil {
+		return gocache.ErrNilCache
+	}
+
+	// Lock the cache
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// Check if the item exists
+	item, found := c.items[key]
+	if !found {
+		return gocache.ErrItemNotFound
+	}
+
+	// Update the expiration time
+	item.expiresAt = expiresAt
+	return nil
+}
