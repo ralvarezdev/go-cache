@@ -8,20 +8,20 @@ import (
 )
 
 type (
-	// Item represents a cached value with an expiration time
-	Item struct {
+	// TimedItem represents a cached value with an expiration time
+	TimedItem struct {
 		expiresAt time.Time
 		value     interface{}
 	}
 
-	// Cache represents an in-memory cache
-	Cache struct {
-		items map[string]*Item
+	// DefaultTimedCache represents an in-memory cache
+	DefaultTimedCache struct {
+		items map[string]*TimedItem
 		mutex sync.RWMutex
 	}
 )
 
-// NewItem creates a new cache item
+// NewTimedItem creates a new cache item
 //
 // Parameters:
 //
@@ -30,9 +30,9 @@ type (
 //
 // Returns:
 //
-//   - *Item: A pointer to the newly created cache item
-func NewItem(value interface{}, expiresAt time.Time) *Item {
-	return &Item{
+//   - *TimedItem: A pointer to the newly created cache item
+func NewTimedItem(value interface{}, expiresAt time.Time) *TimedItem {
+	return &TimedItem{
 		expiresAt,
 		value,
 	}
@@ -43,7 +43,7 @@ func NewItem(value interface{}, expiresAt time.Time) *Item {
 // Returns:
 //
 //   - interface{}: The cached value
-func (i *Item) GetValue() interface{} {
+func (i *TimedItem) GetValue() interface{} {
 	if i == nil {
 		return nil
 	}
@@ -55,7 +55,7 @@ func (i *Item) GetValue() interface{} {
 // Parameters:
 //
 //   - value: The value to be cached
-func (i *Item) SetValue(value interface{}) {
+func (i *TimedItem) SetValue(value interface{}) {
 	if i == nil {
 		return
 	}
@@ -67,7 +67,7 @@ func (i *Item) SetValue(value interface{}) {
 // Returns:
 //
 //   - time.Time: The expiration time of the cached value
-func (i *Item) GetExpiresAt() time.Time {
+func (i *TimedItem) GetExpiresAt() time.Time {
 	if i == nil {
 		return time.Time{}
 	}
@@ -79,7 +79,7 @@ func (i *Item) GetExpiresAt() time.Time {
 // Parameters:
 //
 //   - expiresAt: The expiration time to be set
-func (i *Item) SetExpiresAt(expiresAt time.Time) {
+func (i *TimedItem) SetExpiresAt(expiresAt time.Time) {
 	if i == nil {
 		return
 	}
@@ -91,17 +91,17 @@ func (i *Item) SetExpiresAt(expiresAt time.Time) {
 // Returns:
 //
 //   - bool: True if the cached value has expired, false otherwise
-func (i *Item) HasExpired() bool {
+func (i *TimedItem) HasExpired() bool {
 	if i == nil {
 		return true
 	}
 	return time.Now().After(i.expiresAt)
 }
 
-// NewCache creates a new Cache instance
-func NewCache() *Cache {
-	return &Cache{
-		items: make(map[string]*Item),
+// NewDefaultTimedCache creates a new DefaultTimedCache instance
+func NewDefaultTimedCache() *DefaultTimedCache {
+	return &DefaultTimedCache{
+		items: make(map[string]*TimedItem),
 	}
 }
 
@@ -110,19 +110,25 @@ func NewCache() *Cache {
 // Parameters:
 //
 //   - key: The key to associate with the cached value
-//   - item: The item to be cached
+//   - value: The item to be cached
 //
 // Returns:
 //
 //   - error: An error if the item is nil or has expired
-func (c *Cache) Set(key string, item *Item) error {
-	if c == nil {
+func (d *DefaultTimedCache) Set(key string, value interface{}) error {
+	if d == nil {
 		return gocache.ErrNilCache
 	}
 
 	// Lock the cache
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	// Type assert the value to *TimedItem
+	item, ok := value.(*TimedItem)
+	if !ok {
+		return ErrValueMustBeATimedItem
+	}
 
 	// Check if the item is nil or has expired
 	if item == nil {
@@ -133,7 +139,7 @@ func (c *Cache) Set(key string, item *Item) error {
 	}
 
 	// Add the item to the cache
-	c.items[key] = item
+	d.items[key] = item
 	return nil
 }
 
@@ -147,17 +153,17 @@ func (c *Cache) Set(key string, item *Item) error {
 // Returns:
 //
 //   - error: An error if the item is not found
-func (c *Cache) UpdateValue(key string, value interface{}) error {
-	if c == nil {
+func (d *DefaultTimedCache) UpdateValue(key string, value interface{}) error {
+	if d == nil {
 		return gocache.ErrNilCache
 	}
 
 	// Lock the cache
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	// Check if the item exists
-	item, found := c.items[key]
+	item, found := d.items[key]
 	if !found {
 		return gocache.ErrItemNotFound
 	}
@@ -177,17 +183,20 @@ func (c *Cache) UpdateValue(key string, value interface{}) error {
 // Returns:
 //
 //   - error: An error if the item is not found
-func (c *Cache) UpdateExpiresAt(key string, expiresAt time.Time) error {
-	if c == nil {
+func (d *DefaultTimedCache) UpdateExpiresAt(
+	key string,
+	expiresAt time.Time,
+) error {
+	if d == nil {
 		return gocache.ErrNilCache
 	}
 
 	// Lock the cache
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	// Check if the item exists
-	item, found := c.items[key]
+	item, found := d.items[key]
 	if !found {
 		return gocache.ErrItemNotFound
 	}
@@ -206,13 +215,13 @@ func (c *Cache) UpdateExpiresAt(key string, expiresAt time.Time) error {
 // Returns:
 //
 //   - bool: True if the key exists in the cache and has not expired, false otherwise
-func (c *Cache) Has(key string) bool {
-	if c == nil {
+func (d *DefaultTimedCache) Has(key string) bool {
+	if d == nil {
 		return false
 	}
 
 	// Get the item from the cache
-	_, found := c.Get(key)
+	_, found := d.Get(key)
 	return found
 }
 
@@ -226,24 +235,24 @@ func (c *Cache) Has(key string) bool {
 //
 //   - interface{}: The cached value, or nil if not found or expired
 //   - bool: True if the value was found and not expired, false otherwise
-func (c *Cache) Get(key string) (interface{}, bool) {
-	if c == nil {
+func (d *DefaultTimedCache) Get(key string) (interface{}, bool) {
+	if d == nil {
 		return nil, false
 	}
 
 	// Lock the cache
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
 
 	// Check if the item exists
-	item, found := c.items[key]
+	item, found := d.items[key]
 	if !found {
 		return nil, false
 	}
 
 	// Check if the item has expired, and remove it if it has
 	if item.HasExpired() {
-		delete(c.items, key)
+		delete(d.items, key)
 		return nil, false
 	}
 
@@ -255,16 +264,16 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 // Parameters:
 //
 //   - key: The key to remove from the cache
-func (c *Cache) Delete(key string) {
-	if c == nil {
+func (d *DefaultTimedCache) Delete(key string) {
+	if d == nil {
 		return
 	}
 
 	// Lock the cache
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
-	delete(c.items, key)
+	delete(d.items, key)
 }
 
 // GetExpirationTime retrieves the expiration time of a cached item
@@ -276,17 +285,17 @@ func (c *Cache) Delete(key string) {
 // Returns:
 //
 //   - time.Time: The expiration time of the cached item, or zero time if not found
-func (c *Cache) GetExpirationTime(key string) time.Time {
-	if c == nil {
+func (d *DefaultTimedCache) GetExpirationTime(key string) time.Time {
+	if d == nil {
 		return time.Time{}
 	}
 
 	// Lock the cache
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
 
 	// Check if the item exists
-	item, found := c.items[key]
+	item, found := d.items[key]
 	if !found {
 		return time.Time{}
 	}
@@ -304,17 +313,20 @@ func (c *Cache) GetExpirationTime(key string) time.Time {
 // Returns:
 //
 //   - error: An error if the item is not found
-func (c *Cache) UpdateExpirationTime(key string, expiresAt time.Time) error {
-	if c == nil {
+func (d *DefaultTimedCache) UpdateExpirationTime(
+	key string,
+	expiresAt time.Time,
+) error {
+	if d == nil {
 		return gocache.ErrNilCache
 	}
 
 	// Lock the cache
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
 	// Check if the item exists
-	item, found := c.items[key]
+	item, found := d.items[key]
 	if !found {
 		return gocache.ErrItemNotFound
 	}
