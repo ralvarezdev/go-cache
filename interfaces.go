@@ -1,4 +1,4 @@
-package go_cache
+package gocache
 
 type (
 	// Cache represents an in-memory cache
